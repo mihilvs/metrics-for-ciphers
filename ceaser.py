@@ -1,6 +1,44 @@
 import random
 import os
 
+ALPHABET = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j',
+            'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
+            'u', 'v', 'w', 'x', 'y', 'z', '0', '1', '2', '3',
+            '4', '5', '6', '7', '8', '9', '+', '-', '*', '/']
+
+M = len(ALPHABET)
+
+superscript_map = {
+        '⁰': '0', '¹': '1', '²': '2', '³': '3', '⁴': '4', 
+        '⁵': '5', '⁶': '6', '⁷': '7', '⁸': '8', '⁹': '9'
+    }
+
+letter_to_index = {letter: index for index, letter in enumerate(ALPHABET)}
+
+def get_index(letter):
+    return letter_to_index[letter]
+
+alphabet_freq = [0.0716141459118763, 0.013541810396956157,
+                 0.029664948512737686, 0.027217341173455326,
+                 0.11749400142831719, 0.025147297258764995,
+                 0.01527362041044946, 0.04415066747117392,
+                 0.07693444718913535, 0.0016121827131668361,
+                 0.004470128079870396, 0.036336874410671675,
+                 0.025857850648101383, 0.0702179478313537,
+                 0.07326074195801377, 0.021333316727534565,
+                 0.0024433466409145687, 0.05713858708031711,
+                 0.060077485716008724, 0.08928195105899658,
+                 0.027408744853977672, 0.011569434798696751,
+                 0.015138589046793284, 0.008182835088358691,
+                 0.014596824862027116, 0.0030234571109908647,
+                 0.007859677504463081, 0.014130114517739746,
+                 0.008933045747118375, 0.005086946105115362,
+                 0.0037402376748647964, 0.003052954253537117,
+                 0.0023541997212192284, 0.0019664761697501558,
+                 0.0016980521725792597, 0.0014538813815019487,
+                 0.003734338246355546, 0.002018915534276827,
+                 0.00026186907660506243, 0.0007207135162134321]
+
 def find_values(file):
 
     def encrypt(file, s):
@@ -8,9 +46,12 @@ def find_values(file):
         words = [""]
         for line in file.readlines():
             for letter in line:
+                if letter in superscript_map:
+                    letter = superscript_map[letter]
                 if letter.isalpha():
                     letter = letter.lower()
-                    words[-1] += str((ord(letter) + s - 97) % 26)
+                if letter in ALPHABET:
+                    words[-1] += str((get_index(letter) + s) % M)
                     if words[-1].count("-") == 4:
                         words.append("")
                     else:
@@ -23,22 +64,17 @@ def find_values(file):
         return " ".join(words)
 
     def decrypt(file):
-        #https://blogs.sas.com/content/iml/2014/09/19/frequency-of-letters.html
-        english_freq = [.0804, .0148, .0334, .0382, .1249, .0240, .0187,
-                        .0505, .0757, .0016, .0054, .0407, .0251, .0723,
-                        .0764, .0214, .0012, .0628, .0651, .0928, .0273,
-                        .0105, .0168, .0023, .0166, .0009]
 
         def freq_vector(file, shift):
             file = open(file, "r")
-            count = [0] * 26
+            count = [0] * M
             total = 0
 
             for line in file.readlines():
                 for string in line.split(" "):
                     for number in string.split("-"):
                         if number.isnumeric(): 
-                            count[(int(number) + shift) % 26] += 1
+                            count[(int(number) + shift) % M] += 1
                         total += 1
             for i in range(len(count)):
                 count[i] /= total
@@ -47,20 +83,20 @@ def find_values(file):
 
         def compare_abs(vector):
             res = 0
-            for i in range(26):
-                res += abs(vector[i] - english_freq[i])
+            for i in range(M):
+                res += abs(vector[i] - alphabet_freq[i])
             return res
 
         def compare_square(vector):
             res = 0
-            for i in range(26):
-                res += (vector[i] - english_freq[i])**2
+            for i in range(M):
+                res += (vector[i] - alphabet_freq[i])**2
             return res
 
         def compare_dot(vector):
             res = 0
-            for i in range(26):
-                res += (vector[i] * english_freq[i])
+            for i in range(M):
+                res += (vector[i] * alphabet_freq[i])
             return res
        
         initial = freq_vector(file, 0)
@@ -68,7 +104,7 @@ def find_values(file):
         sqr_beta, sqr_alpha = float("inf"), compare_square(initial)
         dot_beta, dot_alpha = 0, compare_dot(initial)
 
-        for i in range(1, 26):
+        for i in range(1, M):
             vec = freq_vector(file, i)
             abs_beta = min(abs_beta, compare_abs(vec))
             sqr_beta = min(sqr_beta, compare_square(vec))
@@ -77,14 +113,14 @@ def find_values(file):
         return (abs_alpha, abs_beta, sqr_alpha,
                 sqr_beta, dot_alpha, dot_beta)
     
-    enc_f = "./unciphered/" + file
-    dec_f = "./ciphered/" + file
-    s = 0  #random.randrange(1, 26)
+    enc_f = "./training_unciphered/" + file
+    dec_f = "./training_ciphered/" + file
+    s = 0  
     
-    with open(dec_f, 'w') as f:
-        f.write(encrypt(enc_f, s))
+    #with open(dec_f, 'w') as f:
+    #   f.write(encrypt(enc_f, s))
 
-    return decrypt(dec_f) 
+    return decrypt("./training_ciphered/" + file) 
        
 
 def main():
@@ -92,27 +128,32 @@ def main():
     square_alpha, square_beta = 0, float('inf')
     dprod_alpha, dprod_beta = float("inf"), 0
 
-    for file in os.listdir("./unciphered"):
-
+    for file in os.listdir("./training_ciphered"):
+#        print("---------------")
+#        print(file)
         (abs_alpha, abs_beta, sqr_alpha,
      sqr_beta, dot_alpha, dot_beta) = find_values(file)
-
-        #print("Abs:", abs_alpha, abs_beta)
+#        print("----------------")
+#        print("Abs:", abs_alpha, abs_beta)
         absolute_alpha, absolute_beta = (max(absolute_alpha, abs_alpha),
                                      min(absolute_beta, abs_beta))
-        #print("Sqr:", sqr_alpha, sqr_beta)
+#        print("---------------")
+#        print("Sqr:", sqr_alpha, sqr_beta)
         square_alpha, square_beta = (max(square_alpha, sqr_alpha),
                                  min(square_beta, sqr_beta))
-        #print("Dot Prod:", dot_alpha, dot_beta) 
+#        print("------------------")
+#        print("Dot Prod:", dot_alpha, dot_beta) 
         dprod_alpha, dprod_beta = (min(dprod_alpha, dot_alpha),
                                max(dprod_beta, dot_beta))
 
     print(f"For Absolute Value: \n"
           f"Alpha = {absolute_alpha} \n"
           f"Beta = {absolute_beta}")
+    print("________________________")
     print(f"For Squared Value: \n"
           f"Alpha = {square_alpha} \n"
           f"Beta = {square_beta}")
+    print("________________________")
     print(f"For Dot Product: \n"
           f"Alpha = {dprod_alpha} \n"
           f"Beta = {dprod_beta}")

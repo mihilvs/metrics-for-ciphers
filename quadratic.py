@@ -1,24 +1,64 @@
 import random
 import os
 
+ALPHABET = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j',
+            'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
+            'u', 'v', 'w', 'x', 'y', 'z', '0', '1', '2', '3',
+            '4', '5', '6', '7', '8', '9', '+', '-', '*', '/']
+
+M = len(ALPHABET)
+
+superscript_map = {
+        '⁰': '0', '¹': '1', '²': '2', '³': '3', '⁴': '4', 
+        '⁵': '5', '⁶': '6', '⁷': '7', '⁸': '8', '⁹': '9'
+    }
+
+letter_to_index = {letter: index for index, letter in enumerate(ALPHABET)}
+
+def get_index(letter):
+    return letter_to_index[letter]
+
+alphabet_freq = [0.0716141459118763, 0.013541810396956157,
+                 0.029664948512737686, 0.027217341173455326,
+                 0.11749400142831719, 0.025147297258764995,
+                 0.01527362041044946, 0.04415066747117392,
+                 0.07693444718913535, 0.0016121827131668361,
+                 0.004470128079870396, 0.036336874410671675,
+                 0.025857850648101383, 0.0702179478313537,
+                 0.07326074195801377, 0.021333316727534565,
+                 0.0024433466409145687, 0.05713858708031711,
+                 0.060077485716008724, 0.08928195105899658,
+                 0.027408744853977672, 0.011569434798696751,
+                 0.015138589046793284, 0.008182835088358691,
+                 0.014596824862027116, 0.0030234571109908647,
+                 0.007859677504463081, 0.014130114517739746,
+                 0.008933045747118375, 0.005086946105115362,
+                 0.0037402376748647964, 0.003052954253537117,
+                 0.0023541997212192284, 0.0019664761697501558,
+                 0.0016980521725792597, 0.0014538813815019487,
+                 0.003734338246355546, 0.002018915534276827,
+                 0.00026186907660506243, 0.0007207135162134321]
 
 def find_values(file):
 
     def determine_bijection(a,b,c):
         found = set()
-        for x in range(0, 26):
-            found.add((a * (x**2) + b * x + c) % 26)
-        return len(found) == 26
+        for x in range(0, M):
+            found.add((a * (x**2) + b * x + c) % M)
+        return len(found) == M
 
     def encrypt(file, a, b, c):
         file = open(file, 'r')
         words = [""]
         for line in file.readlines():
             for letter in line:
+                if letter in superscript_map:
+                    letter = superscript_map[letter]
                 if letter.isalpha():
                     letter = letter.lower()
-                    words[-1] += str((a * (ord(letter) - 97)**2 + 
-                                      b * (ord(letter) - 97) + c) % 26)
+                if letter in ALPHABET:
+                    words[-1] += str((a * (get_index(letter))**2 + 
+                                      b * (get_index(letter)) + c) % M)
                                       
                     if words[-1].count("-") == 4:
                         words.append("")
@@ -32,15 +72,10 @@ def find_values(file):
         return " ".join(words)
 
     def decrypt(file):
-        #https://blogs.sas.com/content/iml/2014/09/19/frequency-of-letters.html
-        english_freq = [.0804, .0148, .0334, .0382, .1249, .0240, .0187,
-                        .0505, .0757, .0016, .0054, .0407, .0251, .0723,
-                        .0764, .0214, .0012, .0628, .0651, .0928, .0273,
-                        .0105, .0168, .0023, .0166, .0009]
 
         def freq_vector(file, a, b, c):
             file = open(file, "r")
-            count = [0] * 26
+            count = [0] * M
             total = 0
 
             for line in file.readlines():
@@ -48,7 +83,7 @@ def find_values(file):
                     for number in string.split("-"):
                         if number.isnumeric(): 
                             count[(a * int(number)**2 + 
-                                   b * int(number) + c) % 26] += 1
+                                   b * int(number) + c) % M] += 1
                         total += 1
             for i in range(len(count)):
                 count[i] /= total
@@ -56,20 +91,20 @@ def find_values(file):
 
         def compare_abs(vector):
             res = 0
-            for i in range(26):
-                res += abs(vector[i] - english_freq[i])
+            for i in range(M):
+                res += abs(vector[i] - alphabet_freq[i])
             return res
 
         def compare_square(vector):
             res = 0
-            for i in range(26):
-                res += (vector[i] - english_freq[i])**2
+            for i in range(M):
+                res += (vector[i] - alphabet_freq[i])**2
             return res
 
         def compare_dot(vector):
             res = 0
-            for i in range(26):
-                res += (vector[i] * english_freq[i])
+            for i in range(M):
+                res += (vector[i] * alphabet_freq[i])
             return res
 
         soln_vec = freq_vector(file, 0, 1, 0) 
@@ -77,9 +112,10 @@ def find_values(file):
         sqr_beta, sqr_alpha = float("inf"), compare_square(soln_vec)
         dot_beta, dot_alpha = 0, compare_dot(soln_vec)
 
-        for a in [0, 13]:
-            for b in range(0, 26):
-                for c in range(0, 26):
+        for a in [10, 30]:
+            for b in [1, 3, 7, 9, 11, 13, 17, 19,
+                      21, 23, 27, 29, 31, 33, 37, 39]:
+                for c in range(0, M):
                     if (determine_bijection(a,b,c) and 
                         (vec := freq_vector(file, a, b, c)) != soln_vec):
                         abs_beta = min(abs_beta, compare_abs(vec))
@@ -89,8 +125,8 @@ def find_values(file):
         return (abs_alpha, abs_beta, sqr_alpha,
                 sqr_beta, dot_alpha, dot_beta)
 
-    enc_f = "./unciphered/" + file
-    dec_f = "./ciphered/" + file
+    enc_f = "./training_unciphered/" + file
+    dec_f = "./training_ciphered/" + file
     a = 0  #random.randrange(1, 26)
     b = 1
     c = 0
@@ -106,7 +142,7 @@ def main():
     square_alpha, square_beta = 0, float('inf')
     dprod_alpha, dprod_beta = float("inf"), 0
 
-    for file in os.listdir("./unciphered"):
+    for file in os.listdir("./training_ciphered"):
 
         (abs_alpha, abs_beta, sqr_alpha, 
          sqr_beta, dot_alpha, dot_beta) = find_values(file)
